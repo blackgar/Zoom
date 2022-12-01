@@ -3,12 +3,13 @@ const socket = io();
 
 const $welcome = document.getElementById("welcome");
 const $room = document.getElementById("room");
-const $form = $welcome.querySelector("form");
+const $form = $welcome.querySelector("#name");
+const $nick = $welcome.querySelector("#nick");
 
 // 처음에는 방을 보여주지 않고 숨겼다가 방에 들어가면 방을 보여주도록 한다.
 $room.hidden = true;
 
-let roomName;
+let roomName, nickName;
 
 // 인자를 받아 메시지를 추가해주는 함수
 function addMessage(message) {
@@ -18,6 +19,28 @@ function addMessage(message) {
   $ul.appendChild($li);
 }
 
+// 메시지를 입력했을 때 관련된 이벤트를 서버측에서 감지할 수 있게 하고 메시지 내용을 전달해서 다시 그 메시지 내용으로 화면에 나타날 수 있게끔 하는 함수
+function handleMessageSubmit(event) {
+  event.preventDefault();
+  const $input = $room.querySelector("#msg input");
+  // 메시지 내용과 방이름을 같이 인자로 전달해서 어느 방으로 메시지를 보내야할지를 정할 수 있도록 한다.
+  socket.emit("new_message", $input.value, roomName, () => {
+    console.log($input.value);
+    // addMessage(`You: ${$input.value}`);
+    addMessage(`${nickName}(You): ${$input.value}`);
+    // 이부분을 밖에 쓰게 되면 내용이 나타나지 않는다. socket통신보다 먼저 그 아래 코드를 실행하므로. 동기/비동기!
+    $input.value = "";
+  });
+  // 이렇게 하면 내가 친 채팅이 안보인다.
+  // $input.value = "";
+}
+function handleNicknameSubmit(event) {
+  event.preventDefault();
+  const $input = $welcome.querySelector("#nick input");
+  nickName = $input.value;
+  socket.emit("nickname", $input.value);
+}
+
 // 백엔드에서 처리 완료했을 때 작동시킬 함수, 서버측에서 인자 전달이 가능하다.
 function showRoom() {
   // 방에 들어가게 되면 방이름 입력창을 안보이게 하고 방 안에 채팅 부분을 보이게 하기
@@ -25,6 +48,9 @@ function showRoom() {
   $room.hidden = false;
   const h3 = $room.querySelector("h3");
   h3.innerText = `Room ${roomName}`;
+  const $msg = $room.querySelector("#msg");
+
+  $msg.addEventListener("submit", handleMessageSubmit);
 }
 
 function handleRoomSubmit(event) {
@@ -38,8 +64,15 @@ function handleRoomSubmit(event) {
 }
 
 $form.addEventListener("submit", handleRoomSubmit);
+$nick.addEventListener("submit", handleNicknameSubmit);
 
 // server에서 메시지를 보낼 때 내보낸 welcome event가 감지되면 메시지를 추가하는 함수 실행하기.
-socket.on("welcome", () => {
-  addMessage("Someone Joined");
+socket.on("welcome", (nickname) => {
+  addMessage(`${nickname}님이 들어오셨습니다.`);
 });
+
+socket.on("bye", (nickname) => {
+  addMessage(`${nickname}님이 나가셨습니다.`);
+});
+
+socket.on("new_message", addMessage);

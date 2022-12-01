@@ -40,7 +40,7 @@ wsServer.on("connection", (socket) => {
     // 방에 들어가게 됐을 때 방에 대한 내용을 보여주는것으로 바꿔주는 함수
     showRoom();
     // roomName안에 있는 모든 유저들에게 메시지 보내기
-    socket.to(roomName).emit("welcome");
+    socket.to(roomName).emit("welcome", socket.nickname);
     // console.log(socket.rooms);
     // setTimeout(() => {
     //   // 서버 작업이 끝난 뒤 완료 문구 표시를 위한 함수
@@ -48,6 +48,21 @@ wsServer.on("connection", (socket) => {
     //   // 인자도 전달이 가능하다.
     //   done("처리했습니다.");
     // }, 1000);
+  });
+
+  // disconnecting이라는 이벤트는 완전히 연결이 끊어지기 전 이벤트를 나타내는데 이를 감지해서 사용자가 방을 떠날 때 해당 방의 유저들에게 마지막 인사를 하는 메시지를 보낼 수 있다.
+  socket.on("disconnecting", () => {
+    // rooms에 있는 id값이나 이름을 이용해서 각 방에 메시지 보내기
+    socket.rooms.forEach((room) =>
+      socket.to(room).emit("bye", socket.nickname)
+    );
+  });
+  socket.on("new_message", (msg, room, done) => {
+    socket.to(room).emit("new_message", `${socket.nickname} : ${msg}`);
+    done();
+  });
+  socket.on("nickname", (nickname) => {
+    socket["nickname"] = nickname;
   });
 });
 
