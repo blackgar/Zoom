@@ -7,6 +7,7 @@ const $message = document.querySelector("#message");
 // front-end에서 backend와 연결하기 위해서는 ws주소를 통해 연결을 해야 한다.
 const socket = new WebSocket(`ws://${window.location.host}`);
 
+// json형태로 메시지를 보내주는 함수
 function makeMessage(type, payload) {
   const msg = { type, payload };
   return JSON.stringify(msg);
