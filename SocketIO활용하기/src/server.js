@@ -28,6 +28,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 // 어떤 유저들이 지금 소켓에 연결되어 있는지 알기 위해 sockets란 변수에 담아준다. 즉, 연결된 여러 브라우저의 socket값이 담기게 된다.
+// 하지만, 이렇게 연결된 것들을 모두 배열에 담게 될 경우 어떤 사람이 연결을 끊게 되면 sockets안에 그 유저를 제거해야하고 최신화 해주고 업데이트를 일일이 해줘야 하는 번거로움이 생긴다. 이미 이러한 것들을 작동하게 해주는 framework가 있기 때문에 이렇게 직접 만들어보면서 어떻게 동작하는지 이해한 후 framework를 통해 완성된 채팅방을 만들어보는 것이 좋다.
 const sockets = [];
 
 // 연결 이벤트가 발생했을 때 callback 함수를 실행. 이때 socket이라는 브라우저와 연결해주는 중간자 역할을 하는 인자를 같이 넘겨준다. 즉, socket은 현재 연결된 브라우저를 의미
