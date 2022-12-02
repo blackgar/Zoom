@@ -29,6 +29,10 @@ wsServer.on("connection", (socket) => {
   socket.on("answer", (answer, roomName) =>
     socket.to(roomName).emit("answer", answer)
   );
+  // 브라우저끼리 candidate을 주고 받을 수 있게 하기
+  socket.on("ice", (ice, roomName) => {
+    socket.to(roomName).emit("ice", ice);
+  });
 });
 
 const handleListen = () =>

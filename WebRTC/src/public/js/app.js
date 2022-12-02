@@ -57,6 +57,7 @@ async function getMedia(deviceId) {
       // 초기값 유무에 따른 조건 적용
       deviceId ? cameraConstraints : initialConstrains
     );
+    // 받아온 내 미디어 정보로 화면에 나타내주기
     $myFace.srcObject = myStream;
     if (!deviceId) await getCameras();
   } catch (e) {
@@ -162,10 +163,18 @@ socket.on("answer", (answer) => {
   myPeerConnection.setRemoteDescription(answer);
 });
 
+socket.on("ice", (ice) => {
+  console.log("candidate 받았습니다~");
+  myPeerConnection.addIceCandidate(ice);
+});
+
 // RTC 연결 설정 코드
 function makeConnection() {
   // peerConnection을 브라우저 사이에 만들기
   myPeerConnection = new RTCPeerConnection();
+  // RTCIceCandidate => Interactive Connectivity Establishment(상호 연결 생성(ICE), IceCandidate = WebRTC에 필요한 프로토콜을 의미, 멀리 떨어진 장치와 소통할 수 있게 하는 즉, 브라우저끼리 통신할 수 있게)
+  myPeerConnection.addEventListener("icecandidate", handleIce);
+  myPeerConnection.addEventListener("addstream", handleAddStream);
   // console.log(myStream.getTracks());
   // 양쪽 브라우저의 track을 통해 카메라와 마이크의 데이터 stream을 받아서 연결안에 집어넣기. 아직 연결된게 아니라 각자 브라우저에 환경을 구성한 것.
   // 현재 개발 환경에서는 크롬 브라우저가 peer A, safari가 peer B가 된다.
@@ -174,4 +183,22 @@ function makeConnection() {
     .forEach((track) => myPeerConnection.addTrack(track, myStream));
 }
 
-// RTCIceCandidate => Internet Connectivity Establishment(인터넷 연결 생성(ICE), IceCandidate = WebRTC에 필요한 프로토콜을 의미, 멀리 떨어진 장치와 소통할 수 있게 하는 즉, 브라우저끼리 통신할 수 있게)
+function handleIce(data) {
+  console.log("candidate 보냅니다~");
+  // 브라우저끼리 candidate을 주고 받을 수 있게 하기
+  socket.emit("ice", data.candidate, roomName);
+  // console.log("got ice candidate");
+  // console.log(data);
+}
+
+function handleAddStream(data) {
+  console.log("연결된 peer로부터 이벤트를 받았습니다.");
+  const $peerFace = document.getElementById("peerFace");
+  $peerFace.srcObject = data.stream;
+  // safari의 경우 addstream을 지원하지 않아 아래와 같은 코드로 변환 필요
+  // const peerFace = document.getElementById("peerFace");
+  // peerFace.srcObject = data.streams[0];
+  // 이 stream 확인을 통해 현재 연결된 브라우저와 내 브라우저의 차이를 더 이해하기 쉽다.
+  // console.log("Peer stream", data.stream);
+  // console.log("My stream", myStream);
+}
