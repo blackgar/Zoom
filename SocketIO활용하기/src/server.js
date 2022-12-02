@@ -1,7 +1,10 @@
 import http from "http";
 // import WebSocket from "ws";
-import SocketIO from "socket.io";
+// import SocketIO from "socket.io";
+// admin UI를 쓰기 위해 새롭게 import
+import { Server } from "socket.io";
 import express from "express";
+import { instrument } from "@socket.io/admin-ui";
 
 const app = express();
 
@@ -15,9 +18,37 @@ const handleListen = () =>
   console.log(`현재 http://localhost:3000 이 주소와 연결되어 있습니다.`);
 
 const httpServer = http.createServer(app);
-const wsServer = SocketIO(httpServer);
+const wsServer = new Server(httpServer, {
+  // admin 데모 활용을 위한 코드
+  cors: {
+    origin: ["https://admin.socket.io"],
+    credentials: true,
+  },
+});
+instrument(wsServer, { auth: false });
+
+function publicRooms() {
+  const {
+    sockets: {
+      adapter: { sids, rooms },
+    },
+  } = wsServer;
+  const publicRooms = [];
+  rooms.forEach((_, key) => {
+    if (sids.get(key) === undefined) {
+      publicRooms.push(key);
+    }
+  });
+  return publicRooms;
+}
+
+function countRoom(roomName) {
+  return wsServer.sockets.adapter.rooms.get(roomName)?.size;
+}
 
 wsServer.on("connection", (socket) => {
+  // 현재 서버에 연결된 모든 정보를 보여준다. 특히 안에 생성된 rooms와 socket.id를 보여준다.
+  // console.log(wsServer.sockets.adapter);
   // 무슨 이벤트가 발생하건 실행시키는 코드
   socket.onAny((event) => {
     console.log(`Socket Event:${event}`);
@@ -38,9 +69,12 @@ wsServer.on("connection", (socket) => {
     // 방을 생성해주는 방법
     socket.join(roomName);
     // 방에 들어가게 됐을 때 방에 대한 내용을 보여주는것으로 바꿔주는 함수
-    showRoom();
+    showRoom(countRoom(roomName));
     // roomName안에 있는 모든 유저들에게 메시지 보내기
-    socket.to(roomName).emit("welcome", socket.nickname);
+    // 새로운 유저가 방에 들어오면 해당 방의 유저 숫자를 계산해서 인자로 넘겨준다.
+    socket.to(roomName).emit("welcome", socket.nickname, countRoom(roomName));
+    // 방이 생성될때마다 모든 방의 유저들에게 변경된 방 정보를 알려준다.(broadcast)
+    wsServer.sockets.emit("room_change", publicRooms());
     // console.log(socket.rooms);
     // setTimeout(() => {
     //   // 서버 작업이 끝난 뒤 완료 문구 표시를 위한 함수
@@ -54,8 +88,14 @@ wsServer.on("connection", (socket) => {
   socket.on("disconnecting", () => {
     // rooms에 있는 id값이나 이름을 이용해서 각 방에 메시지 보내기
     socket.rooms.forEach((room) =>
-      socket.to(room).emit("bye", socket.nickname)
+      // 새로운 유저가 방에서 나가면 해당 방의 유저 숫자를 계산해서 인자로 넘겨준다. 이 때 disconnecting 이벤트는 완전히 떠난게 아니므로 떠나는 중인 유저까지 포함되어 있기에 -1해준다.
+      socket.to(room).emit("bye", socket.nickname, countRoom(room) - 1)
     );
+  });
+  //
+  socket.on("disconnect", () => {
+    // socket 연결이 끊어질때도 마찬가지로 방 변경정보를 알려준다.
+    wsServer.sockets.emit("room_change", publicRooms());
   });
   socket.on("new_message", (msg, room, done) => {
     socket.to(room).emit("new_message", `${socket.nickname} : ${msg}`);

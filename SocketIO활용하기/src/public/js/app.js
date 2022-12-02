@@ -42,12 +42,13 @@ function handleNicknameSubmit(event) {
 }
 
 // 백엔드에서 처리 완료했을 때 작동시킬 함수, 서버측에서 인자 전달이 가능하다.
-function showRoom() {
+function showRoom(newCount) {
   // 방에 들어가게 되면 방이름 입력창을 안보이게 하고 방 안에 채팅 부분을 보이게 하기
+
   $welcome.hidden = true;
   $room.hidden = false;
   const h3 = $room.querySelector("h3");
-  h3.innerText = `Room ${roomName}`;
+  h3.innerText = `Room ${roomName}. 현재 유저수 : ${newCount}`;
   const $msg = $room.querySelector("#msg");
 
   $msg.addEventListener("submit", handleMessageSubmit);
@@ -55,11 +56,16 @@ function showRoom() {
 
 function handleRoomSubmit(event) {
   event.preventDefault();
+
   const $input = $form.querySelector("input");
   // socket.io의 경우 send가 아닌 emit으로 메시지를 전달하는데 메시지만 보내는 것이 아니라 첫 번째 인자로 특정 이벤트("enter_room")를 지정해서 보내고 두 번째 인자로 전달할 메시지(내용)을 넘겨준다. 이 때 object타입을 포함한 다양한 타입의 메시지를 그냥 전달할 수 있다. 그리고 세 번째 인자로 server에서 프론트엔드에서 실행시킬 callback함수를 지정해서 전달할 수 있다.
   // 이 때 중간에 하나의 값이 아닌 여러개의 값을 연달아 전달할 수 있다. 단, 함수를 포함시킬 때는 무조건 마지막에 넣어야 한다.
-  socket.emit("enter_room", $input.value, showRoom);
   roomName = $input.value;
+  if (!(nickName && roomName)) {
+    alert("닉네임을 설정한 후 방이름을 입력해주세요.");
+    return;
+  }
+  socket.emit("enter_room", $input.value, showRoom);
   $input.value = "";
 }
 
@@ -67,12 +73,30 @@ $form.addEventListener("submit", handleRoomSubmit);
 $nick.addEventListener("submit", handleNicknameSubmit);
 
 // server에서 메시지를 보낼 때 내보낸 welcome event가 감지되면 메시지를 추가하는 함수 실행하기.
-socket.on("welcome", (nickname) => {
+socket.on("welcome", (nickname, newCount) => {
+  const h3 = $room.querySelector("h3");
+  h3.innerText = `Room ${roomName}. 현재 유저수 : ${newCount}`;
   addMessage(`${nickname}님이 들어오셨습니다.`);
 });
 
-socket.on("bye", (nickname) => {
+socket.on("bye", (nickname, newCount) => {
+  const h3 = $room.querySelector("h3");
+  h3.innerText = `Room ${roomName} (${newCount})`;
   addMessage(`${nickname}님이 나가셨습니다.`);
 });
 
 socket.on("new_message", addMessage);
+// 방 정보가 변경되면 현재 남아있는 방에 대한 배열을 값으로 받아온 다음 배열안의 이름을 li태그로 추가해준다. 만약 방이 모두 비어있을 경우 아무것도 추가하지 않고 빈 태그 값 반환.
+socket.on("room_change", (rooms) => {
+  const roomList = $welcome.querySelector("ul");
+  // roomList안에 있던 값을 비워주고 새롭게 받아온 배열을 보여주기 위해
+  roomList.innerHTML = "";
+  if (rooms.length === 0) {
+    return;
+  }
+  rooms.forEach((room) => {
+    const $li = document.createElement("li");
+    $li.innerText = room;
+    roomList.append($li);
+  });
+});
