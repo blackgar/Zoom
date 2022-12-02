@@ -94,6 +94,16 @@ function handleCameraClick() {
 
 async function handleCameraChange() {
   await getMedia($cameraSelect.value);
+  // 카메라를 바꿀 때 연결된 peer 브라우저의 화면에서는 바뀌지 않는 문제를 해겷하기 위해서 우리 peerConnection을 진행할 때 addTrack을 통해서 추가해준 Track을 변경시켜서 화면이 변경될 수 있도록 한다. 즉, peer에 줄 stream을 업데이트 해준다.
+  if (myPeerConnection) {
+    // 생성한 myStream의 첫번째 비디오가 현재 사용하고 있는 카메라 정보이므로 이 정보를 replaceTrack 인자로 넣어서 변경할 수 있게 한다.
+    const videoTrack = myStream.getVideoTracks()[0];
+    const videoSender = myPeerConnection
+      .getSenders()
+      .find((sender) => sender.track.kind === "video");
+    // console.log(videoSender);
+    videoSender.replaceTrack(videoTrack);
+  }
 }
 
 $muteBtn.addEventListener("click", handleMuteClick);
@@ -171,10 +181,26 @@ socket.on("ice", (ice) => {
 // RTC 연결 설정 코드
 function makeConnection() {
   // peerConnection을 브라우저 사이에 만들기
-  myPeerConnection = new RTCPeerConnection();
+  myPeerConnection = new RTCPeerConnection({
+    // 휴대폰과 노트북이 같은 네트워크를 공유하고 있지 않다면 stream을 불러오지 못하는 현상이 생기기 때문에 STUN 서버를 이용해야 한다.
+    // 다만 아이폰 환경에서는 STUN 서버를 이용하더라도 네트워크가 다르면 화면은 공유되지 않고 음성만 공유되는 문제가 발생.
+    iceServers: [
+      {
+        urls: [
+          "stun:stun.l.google.com:19302",
+          "stun:stun1.l.google.com:19302",
+          "stun:stun2.l.google.com:19302",
+          "stun:stun3.l.google.com:19302",
+          "stun:stun4.l.google.com:19302",
+        ],
+      },
+    ],
+  });
   // RTCIceCandidate => Interactive Connectivity Establishment(상호 연결 생성(ICE), IceCandidate = WebRTC에 필요한 프로토콜을 의미, 멀리 떨어진 장치와 소통할 수 있게 하는 즉, 브라우저끼리 통신할 수 있게)
   myPeerConnection.addEventListener("icecandidate", handleIce);
-  myPeerConnection.addEventListener("addstream", handleAddStream);
+  // myPeerConnection.addEventListener("addstream", handleAddStream);
+  // safari나 최신 아이폰은 addstream을 지원하지 않아서 track 이벤트를 감지해야 한다.
+  myPeerConnection.addEventListener("track", handleTrack);
   // console.log(myStream.getTracks());
   // 양쪽 브라우저의 track을 통해 카메라와 마이크의 데이터 stream을 받아서 연결안에 집어넣기. 아직 연결된게 아니라 각자 브라우저에 환경을 구성한 것.
   // 현재 개발 환경에서는 크롬 브라우저가 peer A, safari가 peer B가 된다.
@@ -195,10 +221,16 @@ function handleAddStream(data) {
   console.log("연결된 peer로부터 이벤트를 받았습니다.");
   const $peerFace = document.getElementById("peerFace");
   $peerFace.srcObject = data.stream;
-  // safari의 경우 addstream을 지원하지 않아 아래와 같은 코드로 변환 필요
   // const peerFace = document.getElementById("peerFace");
   // peerFace.srcObject = data.streams[0];
   // 이 stream 확인을 통해 현재 연결된 브라우저와 내 브라우저의 차이를 더 이해하기 쉽다.
   // console.log("Peer stream", data.stream);
   // console.log("My stream", myStream);
+}
+
+function handleTrack(data) {
+  console.log("handle track");
+  // safari의 경우 addstream을 지원하지 않아 아래와 같은 코드로 변환 필요
+  const $peerFace = document.querySelector("#peerFace");
+  $peerFace.srcObject = data.streams[0];
 }
