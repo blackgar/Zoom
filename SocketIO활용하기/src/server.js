@@ -4,6 +4,7 @@ import http from "http";
 // admin UI를 쓰기 위해 새롭게 import
 import { Server } from "socket.io";
 import express from "express";
+// admin UI를 구현해주기 위해 필요한 모듈
 import { instrument } from "@socket.io/admin-ui";
 
 const app = express();
